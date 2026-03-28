@@ -26,7 +26,7 @@ class SimpleLinearRegression:
         self.x_mean = sum(X) / len(X)
         self.y_mean = sum(Y) / len(Y)
         numerator, denominator = 0, 0
-        for xi, yi in zip(x_entry, y_entry):
+        for xi, yi in zip(X, Y):
             numerator += (xi - self.x_mean) * (yi - self.y_mean)
             denominator += ((xi - self.x_mean) ** 2)
         self.b1 = numerator / denominator
