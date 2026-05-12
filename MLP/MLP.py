@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
 
 
@@ -8,13 +7,12 @@ class MLP:
         self.input_size, self.output_size, self.hidden_sizes = input_size, output_size, hidden_sizes
         self.epochs, self.learning_rate = epochs, learning_rate
         self.losses, self.activations, self.outputs = [], [], []
-
         self.weights, self.biases = [], []
         sizes = [input_size] + hidden_sizes + [output_size]
-        self.num_layers = len(sizes)
-        for i in range(self.num_layers - 1):
-            self.weights.append(np.random.randn(sizes[i], sizes[i - 1]))
-            self.biases.append(np.random.randn(sizes[i], 1))
+        self.num_layers = len(sizes) - 1
+        for i in range(self.num_layers):
+            self.weights.append(np.random.randn(sizes[i + 1], sizes[i]) * np.sqrt(2 / sizes[i]))
+            self.biases.append(np.random.randn(sizes[i + 1], 1))
 
     # Activation functions
     @staticmethod
@@ -48,7 +46,7 @@ class MLP:
     def backward(self, X, y):
         num_trainy = X.shape[1]
         gradients = []
-        delta_Z = self.activations[-1]
+        delta_Z = self.activations[-1] - y
         for i in range(self.num_layers - 1, -1, -1):
             delta_W = (1 / num_trainy) * np.dot(delta_Z, self.activations[i].T)
             delta_B = (1 / num_trainy) * np.sum(delta_Z, axis=1, keepdims=True)
@@ -60,10 +58,9 @@ class MLP:
         return gradients
 
     def update_parameters(self, gradients):
-        gradients_w, gradients_b = gradients
         for i in range(len(self.weights)):
-            self.weights[i] -= self.learning_rate * gradients_w[i]
-            self.biases[i] -= self.learning_rate * gradients_b[i]
+            self.weights[i] -= self.learning_rate * gradients[i][0]
+            self.biases[i] -= self.learning_rate * gradients[i][1]
 
     @staticmethod
     def mse_loss(outputs, original):
@@ -71,17 +68,21 @@ class MLP:
 
     def train(self, X_train, y_train):
         for epoch in range(self.epochs):
-            outputs = self.forward(X_train.T)
+            outputs = self.forward(X_train)
             loss = self.mse_loss(outputs, y_train)
             self.losses.append(loss)
             self.update_parameters(self.backward(X_train, y_train))
 
             if epoch % 100 == 0:
-                print(f"Epoch {epoch}, Loss: {loss:.6f}")
+                print(f"Epoch {epoch}, Loss: {loss}")
 
     def predict(self, X):
-        y_hat = self.forward(X)
-        return (y_hat > 0.5).astype(int)
+        pred = self.forward(X)
+        return (pred >= 0.5).astype(int).flatten()
+
+    @staticmethod
+    def activation(_data):
+        return np.where(_data >= 0, 1, 0)
 
     def visualizing_loss(self):
         plt.plot(self.losses)
@@ -91,24 +92,33 @@ class MLP:
         plt.show()
 
 
-and_input = np.array([
-    [0, 0],
-    [0, 1],
-    [1, 0],
-    [1, 1]
-])
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score
 
-and_target = np.array([
-    [0],
-    [0],
-    [0],
-    [1]
-])
+X, y = make_classification(
+    n_samples=1000,
+    n_features=10,
+    n_classes=2,
+    n_informative=5,
+    random_state=42
+)
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+X = X.T
+X_train, X_test, y_train, y_test = train_test_split(X.T, y, test_size=0.2, random_state=42)
+X_train, X_test = X_train.T, X_test.T
 
-input_size = and_input.shape[1]
-hidden_sizes = [2, 2]
-output_size = and_target.shape[1]
-mlp = MLP(input_size, hidden_sizes, output_size, epochs=1000, learning_rate=0.01)
+mlp = MLP(
+    input_size=10,
+    hidden_sizes=[64, 32],
+    output_size=1,
+    epochs=2000,
+    learning_rate=0.001
+)
 
-mlp.train(and_input, and_target)
+mlp.train(X_train, y_train)
+predicts = mlp.predict(X_test)
+print(f"Accuracy: {accuracy_score(y_test, predicts):.4f}")
 mlp.visualizing_loss()
